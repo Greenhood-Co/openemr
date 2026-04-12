@@ -35,7 +35,7 @@ docker compose build openemr_blue
 docker compose up -d mariadb openemr_blue nginx
 ```
 
-When `openemr_blue` is healthy, open **`http://<server>:${HTTP_PORT:-80}/`**. Log in with `OE_USER` / `OE_PASS`.
+When `openemr_blue` is healthy, open **`http://openemr.greenhood.com.ng:${HTTP_PORT:-8008}/`** (set `HTTP_PORT` in `.env`; default in compose is **8008**). Log in with `OE_USER` / `OE_PASS`.
 
 ### Initial admin account (Greenhood)
 
@@ -76,8 +76,8 @@ docker compose build openemr_blue
 
 ## Networking and ports
 
-- **Published:** Nginx **HTTP** (`HTTP_PORT`, default `80`). MariaDB and OpenEMR are **not** published to the host.
-- **HTTPS (443):** Terminate TLS on another reverse proxy, or extend `nginx/default.conf` with `listen 443 ssl`, mount certificate files, and add `"443:443"` under `nginx` → `ports` in `docker-compose.yml`. The default stack only listens on port 80 so a fresh clone does not fail when cert files are absent.
+- **Published:** Nginx **HTTP** on the host as `HTTP_PORT` (**default `8008`** → container `80`). MariaDB and OpenEMR are **not** published to the host. `server_name` is **`openemr.greenhood.com.ng`** in `nginx/default.conf`.
+- **HTTPS:** Not enabled until you add certificates (e.g. **certbot**). `nginx/default.conf` includes a commented `listen 443 ssl` example; then add `"443:443"` (and cert volume mounts) under `nginx` → `ports` in `docker-compose.yml`.
 
 ## Files
 
