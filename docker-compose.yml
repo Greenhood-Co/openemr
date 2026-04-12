@@ -1,11 +1,16 @@
 # Production-style stack: MariaDB + two OpenEMR app slots (blue/green).
 # Host nginx serves this app via sites-enabled (see nginx/openemr.greenhood.com.ng); no nginx container.
 #
-# DB hostname for OpenEMR must be `mysql` (same as docker/production/docker-compose.yml) so the
-# official image resolves the database on the Compose network.
+# MariaDB uses a fixed IPv4 on openemr_internal so OpenEMR can use MYSQL_HOST without Docker DNS
+# (some hosts see flaky getaddrinfo for service names). Override via OPENEMR_MYSQL_HOST in .env.
 #
 # First boot (single installer on empty site volume):
 #   docker compose up -d mysql openemr_blue
+#
+# Do NOT start openemr_green until blue is healthy: both share volume openemr_sites and will race
+# auto_configure. Do not set COMPOSE_PROFILES=standby until after the first successful install.
+#
+# Static DB IP is 172.29.8.10; if you change the subnet or address below, set OPENEMR_MYSQL_HOST to match.
 #
 # Install vhost once on the VPS:
 #   sudo cp nginx/openemr.greenhood.com.ng /etc/nginx/sites-enabled/
@@ -16,7 +21,7 @@
 name: ${COMPOSE_PROJECT_NAME:-greenhood-openemr}
 
 x-openemr-environment: &openemr-environment
-  MYSQL_HOST: mysql
+  MYSQL_HOST: ${OPENEMR_MYSQL_HOST:-172.29.8.10}
   MYSQL_ROOT_PASS: ${MYSQL_ROOT_PASSWORD}
   MYSQL_USER: ${MYSQL_USER:-openemr}
   MYSQL_PASS: ${MYSQL_PASS}
@@ -31,6 +36,10 @@ x-openemr-volumes: &openemr-volumes
 networks:
   openemr_internal:
     driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.29.8.0/24
 
 services:
   mysql:
@@ -38,7 +47,8 @@ services:
     command: ['mariadbd', '--character-set-server=utf8mb4']
     restart: unless-stopped
     networks:
-      - openemr_internal
+      openemr_internal:
+        ipv4_address: 172.29.8.10
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     volumes:

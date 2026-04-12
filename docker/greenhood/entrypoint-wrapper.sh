@@ -47,6 +47,30 @@ if [ -n "${OE_ADMIN_DISPLAY_NAME:-}" ]; then
     ( patch_admin_display_name ) &
 fi
 
+# Quick-setup retries can leave /tmp/php-file-cache as a non-directory; mkdir then fails forever.
+if [ -e /tmp/php-file-cache ] && [ ! -d /tmp/php-file-cache ]; then
+    rm -f /tmp/php-file-cache
+fi
+
+# Reduce crash loops when Docker DNS is briefly unavailable after container start.
+if command -v getent >/dev/null 2>&1; then
+    _db_host="${MYSQL_HOST:-mysql}"
+    i=0
+    while [ "$i" -lt 45 ]; do
+        if getent hosts "$_db_host" >/dev/null 2>&1; then
+            break
+        fi
+        i=$((i + 1))
+        if [ "$i" -eq 1 ] || [ $((i % 10)) -eq 0 ]; then
+            echo "greenhood-openemr-entrypoint: waiting for ${_db_host} to resolve (${i}/45)..." >&2
+        fi
+        sleep 2
+    done
+    if ! getent hosts "$_db_host" >/dev/null 2>&1; then
+        echo "greenhood-openemr-entrypoint: WARNING: cannot resolve ${_db_host}; check Compose network and MYSQL_HOST." >&2
+    fi
+fi
+
 if [ -d /var/www/localhost/htdocs/openemr ]; then
     cd /var/www/localhost/htdocs/openemr || true
 fi
