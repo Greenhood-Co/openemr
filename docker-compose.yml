@@ -1,8 +1,11 @@
 # Production-style stack: MariaDB + two OpenEMR app slots (blue/green).
 # Host nginx serves this app via sites-enabled (see nginx/openemr.greenhood.com.ng); no nginx container.
 #
+# DB hostname for OpenEMR must be `mysql` (same as docker/production/docker-compose.yml) so the
+# official image resolves the database on the Compose network.
+#
 # First boot (single installer on empty site volume):
-#   docker compose up -d mariadb openemr_blue
+#   docker compose up -d mysql openemr_blue
 #
 # Install vhost once on the VPS:
 #   sudo cp nginx/openemr.greenhood.com.ng /etc/nginx/sites-enabled/
@@ -13,7 +16,7 @@
 name: ${COMPOSE_PROJECT_NAME:-greenhood-openemr}
 
 x-openemr-environment: &openemr-environment
-  MYSQL_HOST: mariadb
+  MYSQL_HOST: mysql
   MYSQL_ROOT_PASS: ${MYSQL_ROOT_PASSWORD}
   MYSQL_USER: ${MYSQL_USER:-openemr}
   MYSQL_PASS: ${MYSQL_PASS}
@@ -25,22 +28,28 @@ x-openemr-environment: &openemr-environment
 x-openemr-volumes: &openemr-volumes
   - openemr_sites:/var/www/localhost/htdocs/openemr/sites
 
+networks:
+  openemr_internal:
+    driver: bridge
+
 services:
-  mariadb:
+  mysql:
     image: mariadb:11.8.6@sha256:f5644a292224cdf4b6514aca38b3b4436f0b0443d54170a472cd14261f31402d
     command: ['mariadbd', '--character-set-server=utf8mb4']
     restart: unless-stopped
+    networks:
+      - openemr_internal
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     volumes:
       - mariadb_data:/var/lib/mysql
     healthcheck:
       test: ['CMD', '/usr/local/bin/healthcheck.sh', '--su-mysql', '--connect', '--innodb_initialized']
-      start_period: 1m
-      start_interval: 10s
+      start_period: 2m
+      start_interval: 5s
       interval: 1m
       timeout: 5s
-      retries: 3
+      retries: 5
 
   openemr_blue:
     build:
@@ -48,13 +57,15 @@ services:
       dockerfile: Dockerfile
     image: ${OPENEMR_IMAGE_NAME:-greenhood-openemr}:${OPENEMR_IMAGE_TAG:-local}
     restart: unless-stopped
+    networks:
+      - openemr_internal
     ports:
       - "127.0.0.1:${OPENEMR_BLUE_HOST_PORT:-18081}:80"
     environment:
       <<: *openemr-environment
     volumes: *openemr-volumes
     depends_on:
-      mariadb:
+      mysql:
         condition: service_healthy
     healthcheck:
       test:
@@ -75,13 +86,15 @@ services:
     profiles: [standby]
     image: ${OPENEMR_IMAGE_NAME:-greenhood-openemr}:${OPENEMR_IMAGE_TAG:-local}
     restart: unless-stopped
+    networks:
+      - openemr_internal
     ports:
       - "127.0.0.1:${OPENEMR_GREEN_HOST_PORT:-18082}:80"
     environment:
       <<: *openemr-environment
     volumes: *openemr-volumes
     depends_on:
-      mariadb:
+      mysql:
         condition: service_healthy
     healthcheck:
       test:

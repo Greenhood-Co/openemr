@@ -42,7 +42,7 @@ Adjust `listen` / `server_name` in that file if your public port or domain diffe
 **First startup** (empty site volume — only `openemr_blue`):
 
 ```bash
-docker compose up -d mariadb openemr_blue
+docker compose up -d mysql openemr_blue
 ```
 
 When healthy, open **`http://openemr.greenhood.com.ng:8008/`** (or whatever you set in the vhost). Log in with `OE_USER` / `OE_PASS`.
@@ -95,7 +95,7 @@ export NGINX_SITE_CONF=/etc/nginx/sites-enabled/openemr.greenhood.com.ng
 | Path | Role |
 |------|------|
 | `Dockerfile` | `FROM openemr/openemr`, adds `docker/greenhood/entrypoint-wrapper.sh` |
-| `docker-compose.yml` | `mariadb`, `openemr_blue`, `openemr_green` (profile `standby`); loopback port mappings |
+| `docker-compose.yml` | `mysql` (MariaDB image), `openemr_*`, shared `openemr_internal` network; loopback port mappings |
 | `nginx/openemr.greenhood.com.ng` | Template for **`/etc/nginx/sites-enabled/openemr.greenhood.com.ng`** |
 | **`deploy.sh`** | Blue/green switch (repo root; edits only that vhost) |
 | `.env.example` | Template including `OPENEMR_BLUE_HOST_PORT` / `OPENEMR_GREEN_HOST_PORT` |
@@ -107,6 +107,9 @@ export NGINX_SITE_CONF=/etc/nginx/sites-enabled/openemr.greenhood.com.ng
 
 ## Troubleshooting
 
+- **`getaddrinfo for mariadb` / `mysql` failed:** The database service must be reachable as **`mysql`** on the Compose network (`MYSQL_HOST: mysql`), matching [`docker/production/docker-compose.yml`](docker/production/docker-compose.yml). After changing compose, run `docker compose down` then `docker compose up -d mysql openemr_blue` (use `--remove-orphans` if you renamed services).
+- **Install loop after a failed first run:** If `sites/default` was half-written, remove the app volume and retry (this wipes the OpenEMR site, not the DB):  
+  `docker compose down && docker volume rm greenhood-openemr_openemr_sites` (adjust volume name with `docker volume ls`) then `docker compose up -d mysql openemr_blue`.
 - **“nginx vhost not found”:** Copy `nginx/openemr.greenhood.com.ng` to `/etc/nginx/sites-enabled/` (see above).
 - **“could not find openemr.sh”:** See [`docker/greenhood/entrypoint-wrapper.sh`](docker/greenhood/entrypoint-wrapper.sh) and verify the parent image layout.
 - **Health check fails on HTTP:** Align `healthcheck` with [`docker/production/docker-compose.yml`](docker/production/docker-compose.yml) if the app only answers on HTTPS internally.
