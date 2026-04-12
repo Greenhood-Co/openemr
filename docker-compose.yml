@@ -1,10 +1,14 @@
-# Production-style stack: MariaDB + two OpenEMR app slots (blue/green) + Nginx.
-# Based on docker/production/docker-compose.yml (official MariaDB + openemr/openemr patterns).
+# Production-style stack: MariaDB + two OpenEMR app slots (blue/green).
+# Host nginx serves this app via sites-enabled (see nginx/openemr.greenhood.com.ng); no nginx container.
 #
-# First boot: start only blue (avoid parallel auto-installers on an empty site volume).
-#   docker compose up -d mariadb openemr_blue nginx
+# First boot (single installer on empty site volume):
+#   docker compose up -d mariadb openemr_blue
 #
-# After the site exists on the shared volume, use scripts/deploy.sh for zero-downtime cutovers.
+# Install vhost once on the VPS:
+#   sudo cp nginx/openemr.greenhood.com.ng /etc/nginx/sites-enabled/
+#   sudo nginx -t && sudo systemctl reload nginx
+#
+# Blue/green: ./deploy.sh (repo root) — only edits /etc/nginx/sites-enabled/openemr.greenhood.com.ng
 
 name: ${COMPOSE_PROJECT_NAME:-greenhood-openemr}
 
@@ -44,6 +48,8 @@ services:
       dockerfile: Dockerfile
     image: ${OPENEMR_IMAGE_NAME:-greenhood-openemr}:${OPENEMR_IMAGE_TAG:-local}
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:${OPENEMR_BLUE_HOST_PORT:-18081}:80"
     environment:
       <<: *openemr-environment
     volumes: *openemr-volumes
@@ -69,6 +75,8 @@ services:
     profiles: [standby]
     image: ${OPENEMR_IMAGE_NAME:-greenhood-openemr}:${OPENEMR_IMAGE_TAG:-local}
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:${OPENEMR_GREEN_HOST_PORT:-18082}:80"
     environment:
       <<: *openemr-environment
     volumes: *openemr-volumes
@@ -89,14 +97,6 @@ services:
       interval: 1m
       timeout: 5s
       retries: 3
-
-  nginx:
-    image: nginx:1.26-alpine
-    restart: unless-stopped
-    ports:
-      - "${HTTP_PORT:-8008}:80"
-    volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
 
 volumes:
   mariadb_data: {}

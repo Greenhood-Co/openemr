@@ -1,0 +1,31 @@
+# OpenEMR vhost for the VPS host nginx (sites-enabled).
+# Copy to /etc/nginx/sites-enabled/openemr.greenhood.com.ng and adjust listen/ssl as needed.
+#
+# Blue/green: ./deploy.sh only changes the single `server 127.0.0.1:PORT;` line in
+# upstream openemr_active below (ports must match OPENEMR_*_HOST_PORT in .env / docker-compose).
+#
+# Docker publishes each app container on loopback only (see docker-compose.yml).
+
+upstream openemr_active {
+    server 127.0.0.1:18081;
+}
+
+server {
+    listen 8008;
+    server_name openemr.greenhood.com.ng;
+
+    location / {
+        proxy_pass http://openemr_active;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_redirect off;
+    }
+}
+
+# After certbot, add a second server { listen 443 ssl; ... } and optionally redirect HTTP.
