@@ -7,7 +7,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-ACTIVE_FILE="${ROOT_DIR}/nginx/active-upstream.conf"
+ACTIVE_FILE="${ROOT_DIR}/nginx/default.conf"
 COMPOSE=(docker compose)
 
 if ! docker compose version >/dev/null 2>&1; then
@@ -21,15 +21,15 @@ if [[ ! -f "$ACTIVE_FILE" ]]; then
 fi
 
 get_active_slot() {
-    if grep -q 'openemr_blue' "$ACTIVE_FILE"; then
+    if grep -qE '^[[:space:]]*server openemr_blue:80;' "$ACTIVE_FILE"; then
         echo blue
         return
     fi
-    if grep -q 'openemr_green' "$ACTIVE_FILE"; then
+    if grep -qE '^[[:space:]]*server openemr_green:80;' "$ACTIVE_FILE"; then
         echo green
         return
     fi
-    echo "error: could not parse active backend from ${ACTIVE_FILE}" >&2
+    echo "error: could not find 'server openemr_blue:80;' or 'server openemr_green:80;' in ${ACTIVE_FILE}" >&2
     exit 1
 }
 
@@ -65,7 +65,7 @@ wait_healthy() {
 
 switch_upstream_to() {
     local target="$1"
-    printf 'server openemr_%s:80;\n' "$target" >"$ACTIVE_FILE"
+    sed -i -E "s/^[[:space:]]*server openemr_(blue|green):80;/    server openemr_${target}:80;/" "$ACTIVE_FILE"
 }
 
 reload_nginx() {

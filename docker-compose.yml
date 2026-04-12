@@ -97,7 +97,6 @@ services:
       - "${HTTP_PORT:-8008}:80"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./nginx/active-upstream.conf:/etc/nginx/conf.d/active-upstream.conf:ro
 
 volumes:
   mariadb_data: {}

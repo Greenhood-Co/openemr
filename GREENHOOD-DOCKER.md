@@ -51,7 +51,7 @@ The official image creates the admin from `OE_USER` / `OE_PASS`. The custom entr
 
 ## Blue/green deploy
 
-- The **active** backend is whichever `server` line appears in `nginx/active-upstream.conf` (included inside the `upstream openemr_active` block).
+- The **active** backend is the `server openemr_blue:80;` or `server openemr_green:80;` line inside the `upstream openemr_active` block in `nginx/default.conf` (updated by `deploy.sh`).
 - The standby slot is **`openemr_green`**, gated by the Compose profile **`standby`**, so it does not start on first install.
 
 ```bash
@@ -61,10 +61,10 @@ chmod +x scripts/deploy.sh
 
 The script:
 
-1. Reads active color from `nginx/active-upstream.conf`
+1. Reads active color from `nginx/default.conf` (`server openemr_*:80;`)
 2. Starts the inactive service (`docker compose --profile standby up -d openemr_green` when switching to green)
 3. Waits until Docker reports **healthy**
-4. Rewrites `nginx/active-upstream.conf` and runs **`nginx -s reload`**
+4. Patches the active `server` line in `nginx/default.conf` and runs **`nginx -s reload`**
 5. Stops the old app container
 
 After changing the root `Dockerfile` or base image tag:
@@ -86,8 +86,7 @@ docker compose build openemr_blue
 | `Dockerfile` | `FROM openemr/openemr`, adds `docker/greenhood/entrypoint-wrapper.sh` only |
 | `docker-compose.yml` | `mariadb`, `openemr_blue`, `openemr_green` (profile `standby`), `nginx` |
 | `docker/greenhood/entrypoint-wrapper.sh` | Delegates to upstream `openemr.sh`; optional display-name patch |
-| `nginx/default.conf` | Reverse proxy |
-| `nginx/active-upstream.conf` | Active `server ...` line inside upstream; toggled by `deploy.sh` |
+| `nginx/default.conf` | Reverse proxy + `upstream openemr_active` (active `server` line toggled by `deploy.sh`) |
 | `scripts/deploy.sh` | Blue/green switch |
 | `.env.example` | Variable template for `.env` |
 
