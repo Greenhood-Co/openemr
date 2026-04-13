@@ -75,6 +75,14 @@ if [ -d /var/www/localhost/htdocs/openemr ]; then
     cd /var/www/localhost/htdocs/openemr || true
 fi
 
+# openemr.sh chmods this nested path; npm often hoists oe-cda-schematron to ccdaservice/node_modules only.
+_schematron_nested="./ccdaservice/node_modules/oe-schematron-service/node_modules/oe-cda-schematron"
+_schematron_top="./ccdaservice/node_modules/oe-cda-schematron"
+if [ ! -e "$_schematron_nested" ] && [ -e "$_schematron_top" ]; then
+    mkdir -p ./ccdaservice/node_modules/oe-schematron-service/node_modules
+    ln -sfn "../../oe-cda-schematron" "$_schematron_nested"
+fi
+
 if [ -f ./openemr.sh ]; then
     exec ./openemr.sh "$@"
 fi
