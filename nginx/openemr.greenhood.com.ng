@@ -1,18 +1,25 @@
 # OpenEMR vhost for the VPS host nginx (sites-enabled).
-# Copy to /etc/nginx/sites-enabled/openemr.greenhood.com.ng and adjust listen/ssl as needed.
+# Copy to /etc/nginx/sites-enabled/openemr.greenhood.com.ng and reload nginx.
 #
-# Blue/green: ./deploy.sh only changes the single `server 127.0.0.1:PORT;` line in
-# upstream openemr_active below (ports must match OPENEMR_*_HOST_PORT in .env / docker-compose).
+# Blue/green: ./deploy.sh only changes `server 127.0.0.1:PORT;` in upstream openemr_active
+# (ports must match OPENEMR_*_HOST_PORT in .env / docker-compose).
 #
-# Docker publishes each app container on loopback only (see docker-compose.yml).
+# "Not live" checklist: DNS A/AAAA → this server; firewall allows 80 (and 443 if using TLS);
+# visitors must use http://domain (80) or https://domain (443), not :8008 unless you keep that port.
 
 upstream openemr_active {
     server 127.0.0.1:18081;
 }
 
 server {
-    listen 8008;
+    listen 80;
+    listen [::]:80;
     server_name openemr.greenhood.com.ng;
+
+    # For certbot HTTP-01 (adjust -w path to match how you run certbot).
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
 
     location / {
         proxy_pass http://openemr_active;
@@ -25,7 +32,10 @@ server {
         proxy_set_header Connection "";
         proxy_buffering off;
         proxy_redirect off;
+        client_max_body_size 64M;
+        proxy_read_timeout 300;
     }
 }
 
-# After certbot, add a second server { listen 443 ssl; ... } and optionally redirect HTTP.
+# After certbot (or manually), add a second server { listen 443 ssl http2; ... } with the same
+# location / proxy_pass block and your ssl_certificate paths. Optionally redirect port 80 → https.
