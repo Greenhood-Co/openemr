@@ -83,6 +83,16 @@ if [ ! -e "$_schematron_nested" ] && [ -e "$_schematron_top" ]; then
     ln -sfn "../../oe-cda-schematron" "$_schematron_nested"
 fi
 
+# #region agent log
+_agent_mp=0
+[ -n "${MYSQL_PASS:-}" ] && _agent_mp=1
+_agent_sym=false
+[ -e "$_schematron_nested" ] && _agent_sym=true
+_agent_ts="$(date +%s)000"
+printf '{"sessionId":"437e45","timestamp":%s,"location":"entrypoint-wrapper.sh:pre-openemr.sh","hypothesisId":"H-env","message":"before exec openemr.sh","data":{"mysqlHost":"%s","mysqlUser":"%s","mysqlPassNonEmpty":%s,"schematronSymlink":%s}}\n' \
+    "$_agent_ts" "${MYSQL_HOST:-}" "${MYSQL_USER:-}" "$_agent_mp" "$_agent_sym" >>/tmp/greenhood-debug-437e45.ndjson 2>/dev/null || true
+# #endregion
+
 if [ -f ./openemr.sh ]; then
     exec ./openemr.sh "$@"
 fi
