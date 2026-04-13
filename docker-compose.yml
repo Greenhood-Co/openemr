@@ -51,6 +51,11 @@ services:
         ipv4_address: 172.29.8.10
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      # MariaDB entrypoint creates DB + user on first init (MYSQL_PASSWORD, not MYSQL_PASS).
+      # Without these, only root exists and OpenEMR’s quick setup hits Access denied for openemr@…
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-openemr}
+      MYSQL_USER: ${MYSQL_USER:-openemr}
+      MYSQL_PASSWORD: ${MYSQL_PASS}
     volumes:
       - mariadb_data:/var/lib/mysql
     healthcheck:
