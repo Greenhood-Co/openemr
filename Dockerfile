@@ -10,4 +10,9 @@ FROM ${UPSTREAM_IMAGE}
 COPY docker/greenhood/entrypoint-wrapper.sh /usr/local/bin/greenhood-openemr-entrypoint.sh
 RUN chmod +x /usr/local/bin/greenhood-openemr-entrypoint.sh
 
+# Greenhood: modular container init (scripts are idempotent; see /scripts/init/*.sh)
+COPY docker/greenhood/scripts/init/ /scripts/init/
+COPY docker/greenhood/php/ /var/www/localhost/htdocs/openemr/contrib/greenhood/
+RUN chmod +x /scripts/init/*.sh 2>/dev/null || true
+
 ENTRYPOINT ["/usr/local/bin/greenhood-openemr-entrypoint.sh"]

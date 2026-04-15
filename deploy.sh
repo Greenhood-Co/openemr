@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# Blue/green cutover: edits only the host nginx vhost (not other sites).
-# Default vhost path: /etc/nginx/sites-enabled/openemr.greenhood.com.ng
+# Blue/green cutover: edits docker/greenhood/nginx/active-backend.conf (mounted into the nginx container)
+# and reloads nginx. No host-level nginx required.
 #
-# Requires: Docker Compose v2, sudo (to edit /etc/nginx and reload nginx).
+# Requires: Docker Compose v2, bash, sed, grep.
+#
+# Usage (from repo root):
+#   ./deploy.sh
 
 set -euo pipefail
 
@@ -16,10 +19,7 @@ if [[ -f "${ROOT_DIR}/.env" ]]; then
     set +a
 fi
 
-NGINX_SITE_CONF="${NGINX_SITE_CONF:-/etc/nginx/sites-enabled/openemr.greenhood.com.ng}"
-OPENEMR_BLUE_HOST_PORT="${OPENEMR_BLUE_HOST_PORT:-18081}"
-OPENEMR_GREEN_HOST_PORT="${OPENEMR_GREEN_HOST_PORT:-18082}"
-
+ACTIVE_BACKEND="${ACTIVE_BACKEND_CONF:-${ROOT_DIR}/docker/greenhood/nginx/active-backend.conf}"
 COMPOSE=(docker compose)
 
 if ! docker compose version >/dev/null 2>&1; then
@@ -27,30 +27,21 @@ if ! docker compose version >/dev/null 2>&1; then
     exit 1
 fi
 
-if [[ ! -f "$NGINX_SITE_CONF" ]]; then
-    echo "error: nginx vhost not found: ${NGINX_SITE_CONF}" >&2
-    echo "hint: sudo cp ${ROOT_DIR}/nginx/openemr.greenhood.com.ng ${NGINX_SITE_CONF}" >&2
+if [[ ! -f "$ACTIVE_BACKEND" ]]; then
+    echo "error: active backend file not found: ${ACTIVE_BACKEND}" >&2
     exit 1
 fi
 
-run_priv() {
-    if [[ "$(id -u)" -eq 0 ]]; then
-        "$@"
-    else
-        sudo "$@"
-    fi
-}
-
 get_active_slot() {
-    if grep -qE "^[[:space:]]*server 127\\.0\\.0\\.1:${OPENEMR_BLUE_HOST_PORT};" "$NGINX_SITE_CONF"; then
+    if grep -qE 'openemr_blue:80' "$ACTIVE_BACKEND"; then
         echo blue
         return
     fi
-    if grep -qE "^[[:space:]]*server 127\\.0\\.0\\.1:${OPENEMR_GREEN_HOST_PORT};" "$NGINX_SITE_CONF"; then
+    if grep -qE 'openemr_green:80' "$ACTIVE_BACKEND"; then
         echo green
         return
     fi
-    echo "error: no active upstream matching 127.0.0.1:${OPENEMR_BLUE_HOST_PORT} or :${OPENEMR_GREEN_HOST_PORT} in ${NGINX_SITE_CONF}" >&2
+    echo "error: could not detect active backend (openemr_blue:80 or openemr_green:80) in ${ACTIVE_BACKEND}" >&2
     exit 1
 }
 
@@ -84,20 +75,8 @@ wait_healthy() {
     exit 1
 }
 
-switch_upstream_to() {
-    local target="$1"
-    local port
-    if [[ "$target" == blue ]]; then
-        port="$OPENEMR_BLUE_HOST_PORT"
-    else
-        port="$OPENEMR_GREEN_HOST_PORT"
-    fi
-    run_priv sed -i -E "s/^[[:space:]]*server 127\\.0\\.0\\.1:[0-9]+;/    server 127.0.0.1:${port};/" "$NGINX_SITE_CONF"
-}
-
-reload_host_nginx() {
-    run_priv nginx -t
-    run_priv nginx -s reload
+reload_nginx() {
+    "${COMPOSE[@]}" exec -T nginx nginx -s reload
 }
 
 ACTIVE="$(get_active_slot)"
@@ -110,7 +89,7 @@ fi
 NEW_SERVICE="openemr_${TARGET}"
 OLD_SERVICE="openemr_${ACTIVE}"
 
-echo "Active: ${ACTIVE} -> starting ${NEW_SERVICE}, then switching ${NGINX_SITE_CONF}."
+echo "Active: ${ACTIVE} -> starting ${NEW_SERVICE}, then updating ${ACTIVE_BACKEND} and reloading nginx."
 
 if [[ "$TARGET" == green ]]; then
     WAIT_SVC=(--profile standby up -d "$NEW_SERVICE")
@@ -121,15 +100,17 @@ fi
 "${COMPOSE[@]}" "${WAIT_SVC[@]}"
 wait_healthy "$NEW_SERVICE"
 
-switch_upstream_to "$TARGET"
-reload_host_nginx
-
-if [[ "$TARGET" == blue ]]; then
-    _active_port="$OPENEMR_BLUE_HOST_PORT"
+tmp="$(mktemp)"
+if [[ "$TARGET" == green ]]; then
+    sed -E 's/openemr_blue:80/openemr_green:80/g' "$ACTIVE_BACKEND" >"$tmp"
 else
-    _active_port="$OPENEMR_GREEN_HOST_PORT"
+    sed -E 's/openemr_green:80/openemr_blue:80/g' "$ACTIVE_BACKEND" >"$tmp"
 fi
-echo "Upstream now points to ${TARGET} (127.0.0.1:${_active_port}); stopping ${OLD_SERVICE}."
+mv "$tmp" "$ACTIVE_BACKEND"
+
+reload_nginx
+
+echo "Upstream now points to ${TARGET}; stopping ${OLD_SERVICE}."
 "${COMPOSE[@]}" stop "$OLD_SERVICE"
 
 echo "Done."

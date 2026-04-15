@@ -1,6 +1,54 @@
 #!/bin/sh
 # Chains to the official OpenEMR image entrypoint and optionally patches the
 # initial admin display name after auto-install (OE_ADMIN_DISPLAY_NAME).
+#
+# Also runs optional hooks in /scripts/init/ (sorted *.sh) in the background after
+# Apache answers /meta/health/readyz. Each script should be idempotent (marker files
+# or DB checks).
+
+greenhood_run_init_scripts() {
+    INIT_DIR="/scripts/init"
+    if [ ! -d "$INIT_DIR" ]; then
+        return 0
+    fi
+
+    SITE_DIR="${GREENHOOD_SITE_DIR:-/var/www/localhost/htdocs/openemr/sites/default}"
+    OM_ROOT="/var/www/localhost/htdocs/openemr"
+    export OPENEMR_ROOT="$OM_ROOT"
+    export OE_SITE="${OE_SITE:-default}"
+
+    (
+        i=0
+        while [ "$i" -lt 720 ]; do
+            if [ -f "${SITE_DIR}/sqlconf.php" ] \
+                && command -v curl >/dev/null 2>&1 \
+                && curl -sf "http://127.0.0.1/meta/health/readyz" >/dev/null 2>&1; then
+                break
+            fi
+            i=$((i + 1))
+            sleep 5
+        done
+        if [ "$i" -ge 720 ]; then
+            echo "greenhood-openemr-entrypoint: init scripts skipped (OpenEMR not ready in time)." >&2
+            return 0
+        fi
+        for f in $(ls "$INIT_DIR" 2>/dev/null | LC_ALL=C sort); do
+            case "$f" in
+                *.sh) ;;
+                *) continue ;;
+            esac
+            fp="$INIT_DIR/$f"
+            if [ ! -f "$fp" ]; then
+                continue
+            fi
+            if [ ! -x "$fp" ]; then
+                chmod +x "$fp" 2>/dev/null || true
+            fi
+            echo "greenhood-openemr-entrypoint: running $fp" >&2
+            /bin/sh "$fp" || echo "greenhood-openemr-entrypoint: WARNING: $fp exited non-zero" >&2
+        done
+    ) &
+}
 
 patch_admin_display_name() {
     [ -n "${OE_ADMIN_DISPLAY_NAME:-}" ] || return 0
@@ -46,6 +94,8 @@ patch_admin_display_name() {
 if [ -n "${OE_ADMIN_DISPLAY_NAME:-}" ]; then
     ( patch_admin_display_name ) &
 fi
+
+greenhood_run_init_scripts
 
 # Quick-setup retries can leave /tmp/php-file-cache as a non-directory; mkdir then fails forever.
 if [ -e /tmp/php-file-cache ] && [ ! -d /tmp/php-file-cache ]; then

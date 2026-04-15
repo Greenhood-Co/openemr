@@ -48,6 +48,10 @@ Check out [API_README.md](API_README.md)
 
 Check out [DOCKER_README.md](DOCKER_README.md)
 
+### Greenhood deployment (this fork)
+
+Training / blue–green Docker setup (Nginx, init scripts, demo data): see [GREENHOOD.md](GREENHOOD.md).
+
 ### FHIR
 
 Check out [FHIR_README.md](FHIR_README.md)

@@ -1,22 +1,15 @@
-# Production-style stack: MariaDB + two OpenEMR app slots (blue/green).
-# Host nginx serves this app via sites-enabled (see nginx/openemr.greenhood.com.ng); no nginx container.
+# Greenhood OpenEMR stack (MariaDB + blue/green app + Nginx reverse proxy).
 #
-# MariaDB uses a fixed IPv4 on openemr_internal so OpenEMR can use MYSQL_HOST without Docker DNS
-# (some hosts see flaky getaddrinfo for service names). Override via OPENEMR_MYSQL_HOST in .env.
+# Base: aligned with upstream docker/production/docker-compose.yml (official openemr/openemr image,
+# MariaDB 11.8, healthchecks). Customizations live in ./Dockerfile, docker/greenhood/, and this file —
+# do not edit docker/production/docker-compose.yml in place; merge upstream changes here when upgrading.
 #
-# First boot (single installer on empty site volume):
-#   docker compose up -d mysql openemr_blue
+# First-time install (avoid racing auto_configure on the shared sites volume):
+#   docker compose up -d mysql openemr_blue nginx
+# After blue is healthy and the DB is initialized, you may enable the standby slot:
+#   COMPOSE_PROFILES=standby docker compose up -d openemr_green
 #
-# Do NOT start openemr_green until blue is healthy: both share volume openemr_sites and will race
-# auto_configure. Do not set COMPOSE_PROFILES=standby until after the first successful install.
-#
-# Static DB IP is 172.29.8.10; if you change the subnet or address below, set OPENEMR_MYSQL_HOST to match.
-#
-# Install vhost once on the VPS:
-#   sudo cp nginx/openemr.greenhood.com.ng /etc/nginx/sites-enabled/
-#   sudo nginx -t && sudo systemctl reload nginx
-#
-# Blue/green: ./deploy.sh (repo root) — only edits /etc/nginx/sites-enabled/openemr.greenhood.com.ng
+# Only Nginx is published to the host (see ports on the nginx service).
 
 name: ${COMPOSE_PROJECT_NAME:-greenhood-openemr}
 
@@ -29,6 +22,7 @@ x-openemr-environment: &openemr-environment
   OE_USER: ${OE_USER:-owner}
   OE_PASS: ${OE_PASS}
   OE_ADMIN_DISPLAY_NAME: ${OE_ADMIN_DISPLAY_NAME:-}
+  TRAINING_ACCOUNT_PASSWORD: ${TRAINING_ACCOUNT_PASSWORD:-}
 
 x-openemr-volumes: &openemr-volumes
   - openemr_sites:/var/www/localhost/htdocs/openemr/sites
@@ -51,8 +45,6 @@ services:
         ipv4_address: 172.29.8.10
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      # MariaDB entrypoint creates DB + user on first init (MYSQL_PASSWORD, not MYSQL_PASS).
-      # Without these, only root exists and OpenEMR’s quick setup hits Access denied for openemr@…
       MYSQL_DATABASE: ${MYSQL_DATABASE:-openemr}
       MYSQL_USER: ${MYSQL_USER:-openemr}
       MYSQL_PASSWORD: ${MYSQL_PASS}
@@ -74,8 +66,8 @@ services:
     restart: unless-stopped
     networks:
       - openemr_internal
-    ports:
-      - "127.0.0.1:${OPENEMR_BLUE_HOST_PORT:-18081}:80"
+    expose:
+      - "80"
     environment:
       <<: *openemr-environment
     volumes: *openemr-volumes
@@ -103,8 +95,8 @@ services:
     restart: unless-stopped
     networks:
       - openemr_internal
-    ports:
-      - "127.0.0.1:${OPENEMR_GREEN_HOST_PORT:-18082}:80"
+    expose:
+      - "80"
     environment:
       <<: *openemr-environment
     volumes: *openemr-volumes
@@ -125,6 +117,28 @@ services:
       interval: 1m
       timeout: 5s
       retries: 3
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    networks:
+      - openemr_internal
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+    volumes:
+      - ./docker/greenhood/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/greenhood/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/greenhood/nginx/active-backend.conf:/etc/nginx/active-backend.conf:rw
+    depends_on:
+      openemr_blue:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1/meta/health/readyz']
+      start_period: 3m
+      start_interval: 10s
+      interval: 30s
+      timeout: 5s
+      retries: 5
 
 volumes:
   mariadb_data: {}
