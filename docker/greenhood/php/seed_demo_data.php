@@ -63,7 +63,7 @@ foreach ($patients as $row) {
     $pidRow = sqlQuery("SELECT COALESCE(MAX(pid),0)+1 AS p FROM patient_data");
     $pid = (int) ($pidRow['p'] ?? 1);
 
-    $sql = "INSERT INTO patient_data (pid, uuid, fname, lname, DOB, sex, pubpid, city, country_code, phone_home, email, notes, providerID) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    $sql = "INSERT INTO patient_data (pid, uuid, fname, lname, DOB, sex, pubpid, city, country_code, phone_home, email, billing_note, providerID) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     QueryUtils::sqlStatementThrowException($sql, [
         $pid,
         UuidRegistry::uuidToBytes($uuidStr),
