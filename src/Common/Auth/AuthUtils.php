@@ -518,6 +518,18 @@ class AuthUtils
         $ip = collectIpAddresses();
         $session = SessionWrapperFactory::getInstance()->getActiveSession();
 
+        // Normalize to avoid failed password updates due to accidental whitespace.
+        // This intentionally trims both ends.
+        if (is_string($currentPwd)) {
+            $currentPwd = trim($currentPwd);
+        }
+        if (is_string($newPwd)) {
+            $newPwd = trim($newPwd);
+        }
+        if (is_string($new_username)) {
+            $new_username = trim($new_username);
+        }
+
         if (empty($activeUser) || empty($currentPwd)) {
             $this->errorMessage = xl("Password update error! Empty username or password.");
             $this->clearFromMemory($currentPwd);

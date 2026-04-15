@@ -44,6 +44,14 @@ if (
     // set language direction according to language choice. Later in globals.php we'll override main theme name if needed.
     $session->set('language_direction', getLanguageDir($session->get('language_choice')));
 
+    // Normalize to avoid failed logins due to accidental whitespace.
+    if (isset($_POST['authUser']) && is_string($_POST['authUser'])) {
+        $_POST['authUser'] = trim($_POST['authUser']);
+    }
+    if (isset($_POST['clearPass']) && is_string($_POST['clearPass'])) {
+        $_POST['clearPass'] = trim($_POST['clearPass']);
+    }
+
     // Note we are purposefully keeping $_POST['clearPass'], which is needed for MFA to work. It is cleared from memory after a
     //  unsuccessful or successful login
     $passTemp = $_POST['clearPass'];

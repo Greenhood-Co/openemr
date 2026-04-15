@@ -160,6 +160,20 @@ if (!isset($ignoreAuth_onsite_portal)) {
     $ignoreAuth_onsite_portal = false;
 }
 
+// Normalize login credentials to avoid failed logins due to accidental whitespace.
+if (
+    isset($_GET['auth'])
+    && $_GET['auth'] === 'login'
+    && isset($_POST)
+) {
+    if (isset($_POST['authUser']) && is_string($_POST['authUser'])) {
+        $_POST['authUser'] = trim($_POST['authUser']);
+    }
+    if (isset($_POST['clearPass']) && is_string($_POST['clearPass'])) {
+        $_POST['clearPass'] = trim($_POST['clearPass']);
+    }
+}
+
 // Collect the apache server document root (and convert to windows slashes, if needed)
 $server_document_root = realpath($_SERVER['DOCUMENT_ROOT']);
 if (IS_WINDOWS) {
