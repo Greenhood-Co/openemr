@@ -33,15 +33,15 @@ if [[ ! -f "$ACTIVE_BACKEND" ]]; then
 fi
 
 get_active_slot() {
-    if grep -qE 'openemr_blue:80' "$ACTIVE_BACKEND"; then
+    if grep -qE '172\.29\.8\.11:80' "$ACTIVE_BACKEND"; then
         echo blue
         return
     fi
-    if grep -qE 'openemr_green:80' "$ACTIVE_BACKEND"; then
+    if grep -qE '172\.29\.8\.12:80' "$ACTIVE_BACKEND"; then
         echo green
         return
     fi
-    echo "error: could not detect active backend (openemr_blue:80 or openemr_green:80) in ${ACTIVE_BACKEND}" >&2
+    echo "error: could not detect active backend (172.29.8.11:80 or 172.29.8.12:80) in ${ACTIVE_BACKEND}" >&2
     exit 1
 }
 
@@ -102,9 +102,9 @@ wait_healthy "$NEW_SERVICE"
 
 tmp="$(mktemp)"
 if [[ "$TARGET" == green ]]; then
-    sed -E 's/openemr_blue:80/openemr_green:80/g' "$ACTIVE_BACKEND" >"$tmp"
+    sed -E 's/172\.29\.8\.11:80/172.29.8.12:80/g' "$ACTIVE_BACKEND" >"$tmp"
 else
-    sed -E 's/openemr_green:80/openemr_blue:80/g' "$ACTIVE_BACKEND" >"$tmp"
+    sed -E 's/172\.29\.8\.12:80/172.29.8.11:80/g' "$ACTIVE_BACKEND" >"$tmp"
 fi
 mv "$tmp" "$ACTIVE_BACKEND"
 

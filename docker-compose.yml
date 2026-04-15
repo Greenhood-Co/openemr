@@ -65,7 +65,8 @@ services:
     image: ${OPENEMR_IMAGE_NAME:-greenhood-openemr}:${OPENEMR_IMAGE_TAG:-local}
     restart: unless-stopped
     networks:
-      - openemr_internal
+      openemr_internal:
+        ipv4_address: 172.29.8.11
     expose:
       - "80"
     environment:
@@ -94,7 +95,8 @@ services:
     image: ${OPENEMR_IMAGE_NAME:-greenhood-openemr}:${OPENEMR_IMAGE_TAG:-local}
     restart: unless-stopped
     networks:
-      - openemr_internal
+      openemr_internal:
+        ipv4_address: 172.29.8.12
     expose:
       - "80"
     environment:
