@@ -51,23 +51,30 @@ wait_healthy() {
     local i
     local status
 
+    echo "Waiting for ${svc} to become healthy..."
     for i in $(seq 1 120); do
         cid="$("${COMPOSE[@]}" ps -q "$svc" 2>/dev/null || true)"
         if [[ -z "$cid" ]]; then
+            echo "  [${i}s] container not yet started..."
             sleep 3
             continue
         fi
 
         if docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cid" 2>/dev/null | grep -qx healthy; then
+            echo "  ${svc} is healthy!"
             return 0
         fi
 
         status="$(docker inspect --format='{{.State.Status}}' "$cid" 2>/dev/null || echo unknown)"
         if [[ "$status" == "restarting" ]]; then
+            echo "  [${i}s] container restarting..."
             sleep 3
             continue
         fi
 
+        if [[ $((i % 10)) -eq 0 ]]; then
+            echo "  [${i}s] still waiting (status: ${status})..."
+        fi
         sleep 3
     done
 
@@ -89,7 +96,9 @@ fi
 NEW_SERVICE="openemr_${TARGET}"
 OLD_SERVICE="openemr_${ACTIVE}"
 
-echo "Active: ${ACTIVE} -> starting ${NEW_SERVICE}, then updating ${ACTIVE_BACKEND} and reloading nginx."
+echo "Active: ${ACTIVE} -> building image, then starting ${NEW_SERVICE}, updating ${ACTIVE_BACKEND} and reloading nginx."
+
+"${COMPOSE[@]}" build
 
 if [[ "$TARGET" == green ]]; then
     WAIT_SVC=(--profile standby up -d "$NEW_SERVICE")
@@ -97,6 +106,7 @@ else
     WAIT_SVC=(up -d "$NEW_SERVICE")
 fi
 
+echo "Starting ${NEW_SERVICE}..."
 "${COMPOSE[@]}" "${WAIT_SVC[@]}"
 wait_healthy "$NEW_SERVICE"
 
