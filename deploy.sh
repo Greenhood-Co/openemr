@@ -50,30 +50,34 @@ wait_healthy() {
     local cid
     local i
     local status
+    local health_log
 
     echo "Waiting for ${svc} to become healthy..."
-    for i in $(seq 1 120); do
+    for i in $(seq 1 240); do
         cid="$("${COMPOSE[@]}" ps -q "$svc" 2>/dev/null || true)"
         if [[ -z "$cid" ]]; then
-            echo "  [${i}s] container not yet started..."
+            echo "  [$(printf "%3d" $((i * 3)))] container not yet started..."
             sleep 3
             continue
         fi
 
-        if docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cid" 2>/dev/null | grep -qx healthy; then
+        status="$(docker inspect --format='{{.State.Status}}' "$cid" 2>/dev/null || echo unknown)"
+
+        if [[ "$status" == "restarting" ]]; then
+            echo "  [$(printf "%3d" $((i * 3)))] container restarting..."
+            sleep 3
+            continue
+        fi
+
+        health_status="$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cid" 2>/dev/null)"
+        if echo "$health_status" | grep -qx healthy; then
             echo "  ${svc} is healthy!"
             return 0
         fi
 
-        status="$(docker inspect --format='{{.State.Status}}' "$cid" 2>/dev/null || echo unknown)"
-        if [[ "$status" == "restarting" ]]; then
-            echo "  [${i}s] container restarting..."
-            sleep 3
-            continue
-        fi
-
         if [[ $((i % 10)) -eq 0 ]]; then
-            echo "  [${i}s] still waiting (status: ${status})..."
+            health_log="$(docker inspect --format='{{range .State.Health.Log}}{{.Output | printf "%.100s"}}{{end}}' "$cid" 2>/dev/null || true)"
+            echo "  [$(printf "%3d" $((i * 3)))s] status=${status} health=${health_status} last-check=\"${health_log}\""
         fi
         sleep 3
     done
