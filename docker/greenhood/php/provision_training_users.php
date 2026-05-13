@@ -51,7 +51,7 @@ $accounts = [
     ['email' => 'oluwaseteminire99@gmail.com', 'fname' => 'Oluwaseteminire', 'lname' => 'Deborah Olorunsola', 'acl' => 'Administrators'],
     ['email' => 'okeziec28@gmail.com', 'fname' => 'Collins', 'lname' => 'Chidi Okezie', 'acl' => 'Accounting'],
     ['email' => 'ajibolaoluwashindara@gmail.com', 'fname' => 'Zainab', 'lname' => 'Ajibola Olasupo', 'acl' => 'Clinicians'],
-
+    ['email' => 'greenhoodco1@gmail.com ', 'fname' => 'Greenhood', 'lname' => 'Co', 'acl' => 'Administrators'],
     ['email' => 'teemarahman98@gmail.com', 'fname' => 'Fatimah', 'lname' => 'Ramon', 'acl' => 'Physicians'],
     ['email' => 'folababs002191@gmail.com', 'fname' => 'Folashade', 'lname' => 'Elizabeth Babalola', 'acl' => 'Nursing'],
 ];
