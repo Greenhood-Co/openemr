@@ -18,15 +18,10 @@ use OpenEMR\Common\Uuid\UuidRegistry;
 use OpenEMR\Core\OEGlobalsBag;
 
 $siteDir = OEGlobalsBag::getInstance()->getString('OE_SITE_DIR');
-$marker = $siteDir . '/.greenhood_training_users_complete';
 
 if ($siteDir === '' || !is_dir($siteDir)) {
     fwrite(STDERR, "greenhood provision_training_users: missing site directory.\n");
     exit(1);
-}
-
-if (is_file($marker)) {
-    exit(0);
 }
 
 $plain = getenv('TRAINING_ACCOUNT_PASSWORD');
@@ -181,6 +176,5 @@ foreach ($accounts as $acc) {
     AclExtended::setUserAro([$aclTitle], $username, $fname, '', $lname);
 }
 
-touch($marker);
 fwrite(STDOUT, "greenhood provision_training_users: completed.\n");
 exit(0);
