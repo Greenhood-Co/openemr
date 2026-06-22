@@ -30,31 +30,82 @@ if ($plain === false || $plain === '') {
     exit(0);
 }
 
-$accounts = [
-    ['email' => 'erinsgloria24@gmail.com', 'fname' => 'Gloria', 'lname' => 'Oluwagbemisola Erins', 'acl' => 'Physicians'],
-    ['email' => 'nwamakadeborah67@gmail.com', 'fname' => 'Daniels', 'lname' => 'Nwamaka Deborah', 'acl' => 'Nursing'],
-    ['email' => 'eberenwobodo123@gmail.com', 'fname' => 'Mercy', 'lname' => 'Ebere Nwobodo', 'acl' => 'Front Office'],
-    ['email' => 'joybello538@gmail.com', 'fname' => 'Joy', 'lname' => 'Ayomide Bello', 'acl' => 'Administrators'],
-    ['email' => 'ruthemmanueligbe@gmail.com', 'fname' => 'Ruth', 'lname' => 'Emmanuel-Igbe', 'acl' => 'Accounting'],
-    ['email' => 'janetkalu414@gmail.com', 'fname' => 'Janet', 'lname' => 'Ojiri Kalu', 'acl' => 'Clinicians'],
-
-    ['email' => 'dialamatachi@gmail.com', 'fname' => 'Diala', 'lname' => 'Matachi Ita', 'acl' => 'Physicians'],
-    ['email' => 'edidiong.isemin@gmail.com', 'fname' => 'Edidiong', 'lname' => 'Udom Isemin', 'acl' => 'Nursing'],
-    ['email' => 'princesschimdirin@gmail.com', 'fname' => 'Princess', 'lname' => 'Chimdirin Unachukwu', 'acl' => 'Front Office'],
-    ['email' => 'anayochidalu04@gmail.com', 'fname' => 'Anayo', 'lname' => 'Chidalu Vanessa', 'acl' => 'Administrators'],
-    ['email' => 'enwenonuchiamakasylvia99@gmail.com', 'fname' => 'Chiamaka', 'lname' => 'Sylvia Enwenonu', 'acl' => 'Accounting'],
-    ['email' => 'bethrand10@yahoo.com', 'fname' => 'Bethrand', 'lname' => 'Chikezie Ugwu', 'acl' => 'Clinicians'],
-
-    ['email' => 'animike8@gmail.com', 'fname' => 'Micheal', 'lname' => 'Ngozi Anita', 'acl' => 'Physicians'],
-    ['email' => 'yvonne.ibraheem@gmail.com', 'fname' => 'Amirah', 'lname' => 'Yvonne Ibrahim', 'acl' => 'Nursing'],
-    ['email' => 'adaezendah@gmail.com', 'fname' => 'Adaeze', 'lname' => 'Antonette Ndah', 'acl' => 'Front Office'],
-    ['email' => 'oluwaseteminire99@gmail.com', 'fname' => 'Oluwaseteminire', 'lname' => 'Deborah Olorunsola', 'acl' => 'Administrators'],
-    ['email' => 'okeziec28@gmail.com', 'fname' => 'Collins', 'lname' => 'Chidi Okezie', 'acl' => 'Accounting'],
-    ['email' => 'ajibolaoluwashindara@gmail.com', 'fname' => 'Zainab', 'lname' => 'Ajibola Olasupo', 'acl' => 'Clinicians'],
-    ['email' => 'greenhoodco1@gmail.com ', 'fname' => 'Greenhood', 'lname' => 'Co', 'acl' => 'Administrators'],
-    ['email' => 'teemarahman98@gmail.com', 'fname' => 'Fatimah', 'lname' => 'Ramon', 'acl' => 'Physicians'],
-    ['email' => 'folababs002191@gmail.com', 'fname' => 'Folashade', 'lname' => 'Elizabeth Babalola', 'acl' => 'Nursing'],
+/** @var list<string> $trainingEmails */
+$trainingEmails = [
+    'solotanoluwatomilola@gmail.com',
+    'jjummy72@gmail.com',
+    'adejorinjulius001@gmail.com',
+    'peterreneh@gmail.com',
+    'oliviachukwudoziemva@gmail.com',
+    'seunadeboye84@gmail.com',
+    'maytess813@gmail.com',
+    'ejerukwam08faith@gmail.com',
+    'onyinyechibetty@gmail.com',
+    'olanikeokanlawon205@gmail.com',
+    'idowuesther69@gmail.com',
+    'patiencesimeon6060@gmail.com',
+    'adekunleoderinde14@gmail.com',
+    'emmanueltemitayodan@gmail.com',
+    'amemaben@yahoo.com',
+    'chiamakaeze950@gmail.com',
+    'hap4sure@gmail.com',
+    'onasanyaorachael@gmail.com',
+    'benbanji23@gmail.com',
+    'sovicky1998@gmail.com',
+    'julietogwude@gmail.com',
+    'aminaalex28@gmail.com',
+    'akpaneunice73@gmail.com',
+    'astroglow7725@gmail.com',
+    'hepzialale@gmail.com',
+    'odubiyifavour@gmail.com',
+    'tobbiiee02@gmail.com',
+    'tobiarojoajayi@gmail.com',
+    'chiamakamaryfides@gmail.com',
+    'mavwegrace@gmail.com',
+    'michaelapostle4@gmail.com',
+    'ismailrumar054@gmail.com',
+    'thevictoriatomilola@gmail.com',
+    'nunancice@gmail.com',
+    'imedudo@gmail.com',
+    'nseobongikot@gmail.com',
+    'farmmillionaire18@gmail.com',
+    'crystalijeoma@gmail.com',
+    'wulengmej@gmail.com',
+    'tejuosoakorede0@gmail.com',
+    'peaceifechukwu50@gmail.com',
+    'henryosemedo@gmail.com',
+    'ineneni21@gmail.com',
+    'osaruguestephanieodiase2@gmail.com',
+    'toluawemail@gmail.com',
+    'claradian59@gmail.com',
 ];
+
+/** @var list<string> $aclRotation */
+$aclRotation = ['Physicians', 'Nursing', 'Front Office', 'Administrators', 'Accounting', 'Clinicians'];
+
+$accounts = [];
+$seenEmails = [];
+foreach ($trainingEmails as $index => $rawEmail) {
+    $email = strtolower(trim($rawEmail));
+    if ($email === '' || isset($seenEmails[$email])) {
+        continue;
+    }
+    $seenEmails[$email] = true;
+
+    $local = explode('@', $email, 2)[0] ?? 'training';
+    $namePart = preg_replace('/[0-9]+/', '', $local) ?? $local;
+    $namePart = trim($namePart, '._-');
+    if ($namePart === '') {
+        $namePart = 'training';
+    }
+
+    $accounts[] = [
+        'email' => $email,
+        'fname' => ucfirst($namePart),
+        'lname' => 'Trainee',
+        'acl' => $aclRotation[$index % count($aclRotation)],
+    ];
+}
 
 $availableTitles = AclExtended::aclGetGroupTitleList(true);
 if ($availableTitles === []) {

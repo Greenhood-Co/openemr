@@ -114,6 +114,12 @@ echo "Starting ${NEW_SERVICE}..."
 "${COMPOSE[@]}" "${WAIT_SVC[@]}"
 wait_healthy "$NEW_SERVICE"
 
+if [[ -n "${TRAINING_ACCOUNT_PASSWORD:-}" ]]; then
+    echo "Provisioning training users on ${NEW_SERVICE}..."
+    "${COMPOSE[@]}" exec -T "$NEW_SERVICE" \
+        php /var/www/localhost/htdocs/openemr/contrib/greenhood/provision_training_users.php
+fi
+
 tmp="$(mktemp)"
 if [[ "$TARGET" == green ]]; then
     sed -E 's/172\.29\.8\.11:80/172.29.8.12:80/g' "$ACTIVE_BACKEND" >"$tmp"
