@@ -116,8 +116,10 @@ wait_healthy "$NEW_SERVICE"
 
 if [[ -n "${TRAINING_ACCOUNT_PASSWORD:-}" ]]; then
     echo "Provisioning training users on ${NEW_SERVICE}..."
+    # OpenEMR RootCliGuard forbids PHP CLI as UID 0; run as the web user.
     "${COMPOSE[@]}" exec -T "$NEW_SERVICE" \
-        php /var/www/localhost/htdocs/openemr/contrib/greenhood/provision_training_users.php
+        su -s /bin/sh apache -c \
+        'php /var/www/localhost/htdocs/openemr/contrib/greenhood/provision_training_users.php'
 fi
 
 tmp="$(mktemp)"

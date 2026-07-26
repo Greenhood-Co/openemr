@@ -6,4 +6,5 @@ if [ -z "${TRAINING_ACCOUNT_PASSWORD:-}" ]; then
     exit 0
 fi
 OMR="${OPENEMR_ROOT:-/var/www/localhost/htdocs/openemr}"
-php "${OMR}/contrib/greenhood/provision_training_users.php"
+# OpenEMR RootCliGuard forbids PHP CLI as UID 0; run as the web user.
+su -s /bin/sh apache -c "php '${OMR}/contrib/greenhood/provision_training_users.php'"
