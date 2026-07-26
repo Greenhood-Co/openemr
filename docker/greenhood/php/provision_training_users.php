@@ -30,78 +30,117 @@ if ($plain === false || $plain === '') {
     exit(0);
 }
 
-/** @var list<string> $trainingEmails */
-$trainingEmails = [
-    'solotanoluwatomilola@gmail.com',
-    'jjummy72@gmail.com',
-    'adejorinjulius001@gmail.com',
-    'peterreneh@gmail.com',
-    'oliviachukwudoziemva@gmail.com',
-    'seunadeboye84@gmail.com',
-    'maytess813@gmail.com',
-    'ejerukwam08faith@gmail.com',
-    'onyinyechibetty@gmail.com',
-    'olanikeokanlawon205@gmail.com',
-    'idowuesther69@gmail.com',
-    'patiencesimeon6060@gmail.com',
-    'adekunleoderinde14@gmail.com',
-    'emmanueltemitayodan@gmail.com',
-    'amemaben@yahoo.com',
-    'chiamakaeze950@gmail.com',
-    'hap4sure@gmail.com',
-    'onasanyaorachael@gmail.com',
-    'benbanji23@gmail.com',
-    'sovicky1998@gmail.com',
-    'julietogwude@gmail.com',
-    'aminaalex28@gmail.com',
-    'akpaneunice73@gmail.com',
-    'astroglow7725@gmail.com',
-    'hepzialale@gmail.com',
-    'odubiyifavour@gmail.com',
-    'tobbiiee02@gmail.com',
-    'tobiarojoajayi@gmail.com',
-    'chiamakamaryfides@gmail.com',
-    'mavwegrace@gmail.com',
-    'michaelapostle4@gmail.com',
-    'ismailrumar054@gmail.com',
-    'thevictoriatomilola@gmail.com',
-    'nunancice@gmail.com',
-    'imedudo@gmail.com',
-    'nseobongikot@gmail.com',
-    'farmmillionaire18@gmail.com',
-    'crystalijeoma@gmail.com',
-    'wulengmej@gmail.com',
-    'tejuosoakorede0@gmail.com',
-    'peaceifechukwu50@gmail.com',
-    'henryosemedo@gmail.com',
-    'ineneni21@gmail.com',
-    'osaruguestephanieodiase2@gmail.com',
-    'toluawemail@gmail.com',
-    'claradian59@gmail.com',
+/** @var list<string> $trainingUsernames */
+$trainingUsernames = [
+    'AMN-00493',
+    'AMN-00525',
+    'AMN-00513',
+    'AMN-00521',
+    'AMN-00549',
+    'AMN-00498',
+    'AMN-00491',
+    'AMN-00545',
+    'AMN-00510',
+    'AMN-00486',
+    'AMN-00515',
+    'AMN-00490',
+    'AMN-00517',
+    'AMN-00502',
+    'AMN-00504',
+    'AMN-00537',
+    'AMN-00520',
+    'AMN-00553',
+    'AMN-00511',
+    'AMN-00497',
+    'AMN-00557',
+    'AMN-00487',
+    'AMN-00509',
+    'AMN-00492',
+    'AMN-00519',
+    'AMN-00528',
+    'AMN-00558',
+    'AMN-00522',
+    'AMN-00495',
+    'AMN-00499',
+    'AMN-00523',
+    'AMN-00530',
+    'AMN-00544',
+    'AMN-00542',
+    'AMN-00534',
+    'AMN-00501',
+    'AMN-00560',
+    'AMN-00529',
+    'AMN-00561',
+    'AMN-00538',
+    'AMN-00562',
+    'AMN-00563',
+    'AMN-00539',
+    'AMN-00518',
+    'AMN-00535',
+    'AMN-00496',
+    'AMN-00546',
+    'AMN-00564',
+    'AMN-00566',
+    'AMN-00489',
+    'AMN-00512',
+    'AMN-00488',
+    'AMN-00508',
+    'AMN-00567',
+    'AMN-00569',
+    'AMN-00552',
+    'AMN-00568',
+    'AMN-00494',
+    'AMN-00524',
+    'AMN-00527',
+    'AMN-00551',
+    'AMN-00571',
+    'AMN-00001',
+    'AMN-00565',
+    'AMN-00507',
+    'AMN-00514',
+    'AMN-00554',
+    'AMN-00572',
+    'AMN-00574',
+    'AMN-00556',
+    'AMN-00550',
+    'AMN-00547',
+    'AMN-00536',
+    'AMN-00576',
+    'AMN-00575',
+    'AMN-00577',
+    'AMN-00579',
+    'AMN-00503',
+    'AMN-00555',
+    'AMN-00580',
+    'AMN-00531',
+    'AMN-00573',
+    'AMN-00533',
+    'AMN-00559',
+    'AMN-00582',
+    'AMN-00541',
+    'AMN-00500',
+    'AMN-00548',
+    'AMN-86915',
+    'AMN-00583',
+    'AMN-00584',
 ];
 
 /** @var list<string> $aclRotation */
 $aclRotation = ['Physicians', 'Nursing', 'Front Office', 'Administrators', 'Accounting', 'Clinicians'];
 
 $accounts = [];
-$seenEmails = [];
-foreach ($trainingEmails as $index => $rawEmail) {
-    $email = strtolower(trim($rawEmail));
-    if ($email === '' || isset($seenEmails[$email])) {
+$seenUsernames = [];
+foreach ($trainingUsernames as $index => $rawUsername) {
+    $username = strtoupper(trim($rawUsername));
+    if ($username === '' || isset($seenUsernames[$username])) {
         continue;
     }
-    $seenEmails[$email] = true;
-
-    $local = explode('@', $email, 2)[0] ?? 'training';
-    $namePart = preg_replace('/[0-9]+/', '', $local) ?? $local;
-    $namePart = trim($namePart, '._-');
-    if ($namePart === '') {
-        $namePart = 'training';
-    }
+    $seenUsernames[$username] = true;
 
     $accounts[] = [
-        'email' => $email,
-        'fname' => ucfirst($namePart),
+        'username' => $username,
+        'email' => strtolower($username) . '@training.greenhood.local',
+        'fname' => $username,
         'lname' => 'Trainee',
         'acl' => $aclRotation[$index % count($aclRotation)],
     ];
@@ -144,31 +183,18 @@ $groupNameRow = sqlQuery("SELECT `name` FROM `groups` LIMIT 1");
 $groupName = (string) ($groupNameRow['name'] ?? 'Default');
 
 foreach ($accounts as $acc) {
+    $username = $acc['username'];
     $email = strtolower($acc['email']);
     $fname = $acc['fname'];
     $lname = $acc['lname'];
     $aclPreferred = $acc['acl'];
 
     $dup = sqlQuery(
-        "SELECT id FROM users WHERE LOWER(`email`) = ? LIMIT 1",
-        [$email]
+        "SELECT id FROM users WHERE `username` = ? LIMIT 1",
+        [$username]
     );
     if (!empty($dup['id'])) {
         continue;
-    }
-
-    $parts = explode('@', $email, 2);
-    $local = strtolower($parts[0] ?? '');
-    $local = preg_replace('/[^a-z0-9._-]/', '', $local) ?? '';
-    $local = substr($local, 0, 50);
-    if ($local === '') {
-        $local = 'user';
-    }
-    $username = $local;
-    $n = 0;
-    while (!empty(sqlQuery("SELECT id FROM users WHERE `username` = ?", [$username])['id'])) {
-        $n++;
-        $username = substr($local, 0, 40) . (string) $n;
     }
 
     $userData = [
