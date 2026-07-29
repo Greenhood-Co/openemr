@@ -86,8 +86,9 @@ To **re-run** provisioning after a deliberate reset, delete the relevant marker 
 ## Training accounts and demo data
 
 - **Demo data:** Clearly labeled fictional Nigerian-themed names and `GH-DEMO-*` public patient IDs; emails use `@example.invalid`.
-- **Training users:** Emails are listed in `docker/greenhood/php/provision_training_users.php`. Password for all is taken **only** from **`TRAINING_ACCOUNT_PASSWORD`** in `.env` (never commit real passwords).
-- If a user with the same email already exists, that row is skipped.
+- **Training users:** Usernames are listed in `docker/greenhood/php/provision_training_users.php`. Password for all is taken **only** from **`TRAINING_ACCOUNT_PASSWORD`** in `.env` (never commit real passwords).
+- If a user with the same username already exists, that row is skipped.
+- **Adding users after deployment:** Open `/add/` while signed in with user-administration permission. Paste comma-, space-, or newline-separated usernames, autofill the rows, and assign individual, random, or common roles. This writes directly to the database, so no rebuild is needed after the page has been deployed once.
 
 ## Updating from upstream OpenEMR
 
