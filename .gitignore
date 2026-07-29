@@ -36,6 +36,9 @@ coverage/js-unit
 # phpstan
 tmp-phpstan/*
 
+# blue/green live routing state (seed from active-backend.conf.example)
+docker/greenhood/nginx/active-backend.conf
+
 # easy dev worktree support
 .worktrees.json
 docker/development-easy/docker-compose.override.yml

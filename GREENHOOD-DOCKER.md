@@ -2,7 +2,12 @@
 
 This guide documents the **root `Dockerfile`**, **`docker-compose.yml`**, **host nginx vhost** for this app only, and **`./deploy.sh`** for blue/green cutovers. Upstream files under `docker/library` are **not** modified.
 
-> **Note:** The upstream project `README.md` is unchanged. Use this file as the deployment readme for this layout.
+> **Note:** The upstream project `README.md` is unchanged.
+>
+> **Superseded:** this file documents the earlier layout where app slots were published on loopback
+> ports (`18081` / `18082`) and a **host** nginx did the routing. The current stack ships an `nginx`
+> service inside Compose and routes via `docker/greenhood/nginx/active-backend.conf`. See
+> [`GREENHOOD.md`](GREENHOOD.md), which is authoritative.
 
 ## Why this base configuration
 
@@ -58,7 +63,7 @@ When healthy, open **`http://openemr.greenhood.com.ng:8008/`** (or whatever you 
 ## Blue/green deploy
 
 - **`./deploy.sh`** (repo **root**) only edits **`NGINX_SITE_CONF`** (default **`/etc/nginx/sites-enabled/openemr.greenhood.com.ng`**). It does **not** change `nginx.conf`, `default`, or other vhosts.
-- Standby slot: **`openemr_green`**, Compose profile **`standby`**.
+- Standby slot: **`openemr_green`** (no Compose profile — both slots are ordinary services).
 
 ```bash
 chmod +x deploy.sh

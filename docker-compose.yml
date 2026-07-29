@@ -4,10 +4,12 @@
 # MariaDB 11.8, healthchecks). Customizations live in ./Dockerfile, docker/greenhood/, and this file —
 # do not edit docker/production/docker-compose.yml in place; merge upstream changes here when upgrading.
 #
-# First-time install (avoid racing auto_configure on the shared sites volume):
+# First-time install — name the services so only the blue slot runs the installer
+# (starting both slots at once races auto_configure on the shared sites volume):
+#   cp docker/greenhood/nginx/active-backend.conf.example docker/greenhood/nginx/active-backend.conf
 #   docker compose up -d mysql openemr_blue nginx
-# After blue is healthy and the DB is initialized, you may enable the standby slot:
-#   COMPOSE_PROFILES=standby docker compose up -d openemr_green
+# After blue is healthy and the DB is initialized, add the standby slot:
+#   docker compose up -d openemr_green
 #
 # Only Nginx is published to the host (see ports on the nginx service).
 
@@ -90,8 +92,10 @@ services:
       timeout: 5s
       retries: 3
 
+  # Not behind a Compose profile: the green slot can be the live one, and a profile would
+  # hide it from `docker compose up -d` after a reboot. Name services explicitly on a
+  # first-time install so only one slot runs the installer (see the header comment).
   openemr_green:
-    profiles: [standby]
     image: ${OPENEMR_IMAGE_NAME:-greenhood-openemr}:${OPENEMR_IMAGE_TAG:-local}
     restart: unless-stopped
     networks:
@@ -130,12 +134,13 @@ services:
     volumes:
       - ./docker/greenhood/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./docker/greenhood/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./docker/greenhood/nginx/active-backend.conf:/etc/nginx/active-backend.conf:rw
-    depends_on:
-      openemr_blue:
-        condition: service_healthy
+      # Directory mount, not a single-file mount: a file bind mount follows the inode, so
+      # replacing active-backend.conf (deploy.sh, sed -i, git pull) would be invisible here.
+      - ./docker/greenhood/nginx:/etc/nginx/greenhood:ro
+    # No depends_on for the app slots: nginx proxies to fixed IPs, so it needs neither slot
+    # at startup, and pinning it to one slot blocks recreation while the other slot is live.
     healthcheck:
-      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1/nginx-health']
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1/upstream-health']
       start_period: 3m
       start_interval: 10s
       interval: 30s

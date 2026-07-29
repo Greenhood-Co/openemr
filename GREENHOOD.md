@@ -16,12 +16,23 @@ This document describes the **Greenhood-specific** Docker layout layered on upst
 | `openemr_blue` / `openemr_green` | Two app slots sharing `openemr_sites`; only one should run after cutover (see below) |
 | `nginx` | Only published service (`NGINX_HTTP_PORT`, default 80); proxies to active slot via `docker/greenhood/nginx/active-backend.conf` |
 
+`active-backend.conf` is **untracked live state**, seeded from `active-backend.conf.example`. It is
+mounted through the directory `docker/greenhood/nginx` → `/etc/nginx/greenhood`, and `deploy.sh`
+rewrites it **in place**. Both details matter: a single-file bind mount follows the inode, so
+replacing the file (`mv`, `sed -i`) leaves nginx serving the old slot, and a tracked copy would be
+reverted to blue by `git pull` while blue is stopped.
+
 Volumes: `mariadb_data`, `openemr_sites` (database + site files).
 
 ## Prerequisites
 
 - Docker with **Compose v2** (`docker compose`).
 - Copy `.env.example` to `.env` and set secrets (especially `MYSQL_*`, `OE_*`, `TRAINING_ACCOUNT_PASSWORD`).
+- Seed the routing file once per checkout (it is gitignored, and nginx will not start without it):
+
+```bash
+cp docker/greenhood/nginx/active-backend.conf.example docker/greenhood/nginx/active-backend.conf
+```
 
 ## Build the app image (you run this locally)
 
@@ -39,23 +50,21 @@ Do **not** start `openemr_green` until the first install has finished (shared `s
 docker compose up -d mysql openemr_blue nginx
 ```
 
-When OpenEMR is up, browse to `http://localhost` (or `http://localhost:${NGINX_HTTP_PORT}`). After blue is healthy, you may add the standby slot:
+When OpenEMR is up, browse to `http://localhost` (or `http://localhost:${NGINX_HTTP_PORT}`). After blue is healthy, add the standby slot:
 
 ```bash
-set COMPOSE_PROFILES=standby
 docker compose up -d openemr_green
 ```
 
-(On Linux/macOS you can use `COMPOSE_PROFILES=standby docker compose up -d openemr_green`.)
-
 ## Blue / green cutover
 
-1. Detects active color from `docker/greenhood/nginx/active-backend.conf` (`openemr_blue:80` vs `openemr_green:80`).
-2. Starts the inactive service (`openemr_green` needs `--profile standby` the first time it is created).
+1. Detects active color from `docker/greenhood/nginx/active-backend.conf` (`172.29.8.11` = blue, `172.29.8.12` = green).
+2. Starts the inactive service.
 3. Waits until Docker reports **healthy** (curl `readyz` in the OpenEMR image).
-4. Rewrites `active-backend.conf` to point at the new slot.
+4. Rewrites `active-backend.conf` in place to point at the new slot.
 5. Reloads Nginx in the `nginx` container.
-6. Stops the old app container.
+6. Verifies `/upstream-health` **through nginx**, and rolls the file back (leaving the old slot running) if the new slot cannot be served.
+7. Stops the old app container.
 
 From the repo root:
 
@@ -89,6 +98,33 @@ To **re-run** provisioning after a deliberate reset, delete the relevant marker 
 - **Training users:** Usernames are listed in `docker/greenhood/php/provision_training_users.php`. Password for all is taken **only** from **`TRAINING_ACCOUNT_PASSWORD`** in `.env` (never commit real passwords).
 - If a user with the same username already exists, that row is skipped.
 - **Adding users after deployment:** Open `/add/` while signed in with user-administration permission. Paste comma-, space-, or newline-separated usernames, autofill the rows, and assign individual, random, or common roles. This writes directly to the database, so no rebuild is needed after the page has been deployed once.
+
+## Troubleshooting a 502 after cutover
+
+A 502 means nginx is proxying to a slot that is not serving. Compare what the **container** reads
+with what is running — if these disagree, the file was replaced instead of rewritten in place:
+
+```bash
+docker compose exec nginx grep proxy_pass /etc/nginx/greenhood/active-backend.conf
+docker compose ps
+```
+
+Then check the slot directly (`172.29.8.11` = blue, `172.29.8.12` = green):
+
+```bash
+docker compose exec nginx wget -qO- http://172.29.8.12:80/meta/health/readyz
+```
+
+To repoint nginx by hand, **truncate in place** — `mv` and `sed -i` create a new inode:
+
+```bash
+printf '%s\n' "$(sed 's/172\.29\.8\.11:80/172.29.8.12:80/g' docker/greenhood/nginx/active-backend.conf)" \
+  > docker/greenhood/nginx/active-backend.conf
+docker compose exec nginx nginx -s reload
+```
+
+Note that a fresh app container needs several minutes before it answers: the healthcheck allows a
+3-minute `start_period`, so "connection refused" right after `up -d` is expected.
 
 ## Updating from upstream OpenEMR
 

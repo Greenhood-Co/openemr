@@ -2,6 +2,9 @@
 # Blue/green cutover: edits docker/greenhood/nginx/active-backend.conf (mounted into the nginx container)
 # and reloads nginx. No host-level nginx required.
 #
+# The cutover is verified through nginx and rolled back if the new slot cannot be served,
+# so a failed deploy leaves the previous slot live instead of a 502.
+#
 # Requires: Docker Compose v2, bash, sed, grep.
 #
 # Usage (from repo root):
@@ -20,6 +23,9 @@ if [[ -f "${ROOT_DIR}/.env" ]]; then
 fi
 
 ACTIVE_BACKEND="${ACTIVE_BACKEND_CONF:-${ROOT_DIR}/docker/greenhood/nginx/active-backend.conf}"
+ACTIVE_BACKEND_TEMPLATE="${ROOT_DIR}/docker/greenhood/nginx/active-backend.conf.example"
+BLUE_ADDR="172.29.8.11:80"
+GREEN_ADDR="172.29.8.12:80"
 COMPOSE=(docker compose)
 
 if ! docker compose version >/dev/null 2>&1; then
@@ -28,21 +34,50 @@ if ! docker compose version >/dev/null 2>&1; then
 fi
 
 if [[ ! -f "$ACTIVE_BACKEND" ]]; then
-    echo "error: active backend file not found: ${ACTIVE_BACKEND}" >&2
-    exit 1
+    if [[ ! -f "$ACTIVE_BACKEND_TEMPLATE" ]]; then
+        echo "error: no active backend file (${ACTIVE_BACKEND}) and no template (${ACTIVE_BACKEND_TEMPLATE})." >&2
+        exit 1
+    fi
+    echo "No ${ACTIVE_BACKEND}; seeding it from the template."
+    cp "$ACTIVE_BACKEND_TEMPLATE" "$ACTIVE_BACKEND"
 fi
 
 get_active_slot() {
-    if grep -qE '172\.29\.8\.11:80' "$ACTIVE_BACKEND"; then
+    if grep -qF "$BLUE_ADDR" "$ACTIVE_BACKEND"; then
         echo blue
         return
     fi
-    if grep -qE '172\.29\.8\.12:80' "$ACTIVE_BACKEND"; then
+    if grep -qF "$GREEN_ADDR" "$ACTIVE_BACKEND"; then
         echo green
         return
     fi
-    echo "error: could not detect active backend (172.29.8.11:80 or 172.29.8.12:80) in ${ACTIVE_BACKEND}" >&2
+    echo "error: could not detect active backend (${BLUE_ADDR} or ${GREEN_ADDR}) in ${ACTIVE_BACKEND}" >&2
     exit 1
+}
+
+# Truncate and rewrite the existing file rather than replacing it. `mv` and `sed -i`
+# create a new inode, and nginx would keep serving the old upstream indefinitely.
+set_backend_addr() {
+    local addr="$1"
+    local rendered
+    rendered="$(sed -E "s/172\.29\.8\.1[12]:80/${addr}/g" "$ACTIVE_BACKEND")"
+    printf '%s\n' "$rendered" >"$ACTIVE_BACKEND"
+}
+
+restore_backend_addr() {
+    printf '%s\n' "$PREVIOUS_BACKEND" >"$ACTIVE_BACKEND"
+}
+
+# Proves nginx itself can reach the slot; a healthy app container is not enough.
+verify_through_nginx() {
+    local i
+    for i in $(seq 1 15); do
+        if "${COMPOSE[@]}" exec -T nginx wget -q -O /dev/null http://127.0.0.1/upstream-health; then
+            return 0
+        fi
+        sleep 2
+    done
+    return 1
 }
 
 wait_healthy() {
@@ -100,18 +135,14 @@ fi
 NEW_SERVICE="openemr_${TARGET}"
 OLD_SERVICE="openemr_${ACTIVE}"
 
+PREVIOUS_BACKEND="$(cat "$ACTIVE_BACKEND")"
+
 echo "Active: ${ACTIVE} -> building image, then starting ${NEW_SERVICE}, updating ${ACTIVE_BACKEND} and reloading nginx."
 
 "${COMPOSE[@]}" build
 
-if [[ "$TARGET" == green ]]; then
-    WAIT_SVC=(--profile standby up -d "$NEW_SERVICE")
-else
-    WAIT_SVC=(up -d "$NEW_SERVICE")
-fi
-
 echo "Starting ${NEW_SERVICE}..."
-"${COMPOSE[@]}" "${WAIT_SVC[@]}"
+"${COMPOSE[@]}" up -d "$NEW_SERVICE"
 wait_healthy "$NEW_SERVICE"
 
 if [[ -n "${TRAINING_ACCOUNT_PASSWORD:-}" ]]; then
@@ -122,15 +153,20 @@ if [[ -n "${TRAINING_ACCOUNT_PASSWORD:-}" ]]; then
         'php /var/www/localhost/htdocs/openemr/contrib/greenhood/provision_training_users.php'
 fi
 
-tmp="$(mktemp)"
 if [[ "$TARGET" == green ]]; then
-    sed -E 's/172\.29\.8\.11:80/172.29.8.12:80/g' "$ACTIVE_BACKEND" >"$tmp"
+    set_backend_addr "$GREEN_ADDR"
 else
-    sed -E 's/172\.29\.8\.12:80/172.29.8.11:80/g' "$ACTIVE_BACKEND" >"$tmp"
+    set_backend_addr "$BLUE_ADDR"
 fi
-mv "$tmp" "$ACTIVE_BACKEND"
 
 reload_nginx
+
+if ! verify_through_nginx; then
+    echo "error: nginx cannot serve ${TARGET}; rolling back to ${ACTIVE} and leaving ${OLD_SERVICE} running." >&2
+    restore_backend_addr
+    reload_nginx
+    exit 1
+fi
 
 echo "Upstream now points to ${TARGET}; stopping ${OLD_SERVICE}."
 "${COMPOSE[@]}" stop "$OLD_SERVICE"
